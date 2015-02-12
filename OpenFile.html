@@ -1,0 +1,262 @@
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style>
+  #byte_content {
+    margin: 5px 0;
+    max-height: 100px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  #byte_range { margin-top: 5px; }
+  
+  .textarea {
+    max-width: 1800px;
+    width:95%;
+  }
+</style>
+
+<input type="file" id="files" name="file" multiple/> 
+<button onClick="listFiles();">Lunch></button>
+<span class="readButtons">
+  <button id ="previous">Previous</button> <span id="numberKey">Current Key: </span> <input id="currentKey" style="width:300px;"></input>
+  <button id ="next">Next</button>
+</span>
+
+<button id ="addKey" onClick="addKey();">Add Key</button>
+
+<div id="byte_range"></div>
+
+<div id="byte_content"></div>
+
+<div id="toComplete"></div>
+
+<input id="languageName" type="text" value="Language.properties"></input><button id="save" onClick="newLanguage();">Add Language</button>
+<button id="save" onClick="save();">Save</button>
+<script>
+  var currentLineGlobal = 0;
+  var totalLineGlobal = 0;
+
+  var refKeyGlobal = [];
+
+  var outputGlobal = [];
+  var listNameFilesGlobal = [];
+
+  function listFiles() {
+
+    var filesInput = document.getElementById('files').files;
+
+    for (var index = 0; index < filesInput.length; index++) {
+      console.log(filesInput[index].name);
+      addLanguage(filesInput[index], index);    
+    };
+
+
+
+  }
+
+  //add html content for a new language
+  function injectHtml(name) {
+    document.getElementById("toComplete").innerHTML = document.getElementById("toComplete").innerHTML + name + ': </br>';
+    document.getElementById("toComplete").innerHTML = document.getElementById("toComplete").innerHTML + '<textarea id="' + name + '" type="textBox" class="textarea"></textarea> </br></br>'; 
+  }
+
+
+  function newLanguage() {
+    var name = document.getElementById("languageName").value;
+    if(verifyName(name)) {
+
+      outputGlobal[outputGlobal.length] = refKeyGlobal;
+      listNameFilesGlobal[listNameFilesGlobal.length] = name;
+      injectHtml(name);         
+    }
+    fillFields();
+  }
+
+  function addLanguage(file, index) {
+
+    if(verifyName(file.name)) {
+      listNameFilesGlobal[listNameFilesGlobal.length] = file.name;
+      injectHtml(file.name);   
+
+      readBlob1(file, index);       
+    }
+  }
+
+  function readBlob1(file, index) {
+
+    var reader = new FileReader();
+
+    // If we use onloadend, we need to check the readyState.
+    reader.onloadend = function(evt) {
+      if (evt.target.readyState == FileReader.DONE) { // DONE == 2
+        var output = evt.target.result;
+        lines = output.split("\n");
+
+        console.log("lines number: " + lines.length);
+        fillKeys(lines, file.name);
+        majRefKey(lines);
+
+        if(currentLineGlobal < lines.length ) {
+          line = lines[currentLineGlobal].split("=");
+          key = line[0];
+          value = line[1];
+          document.getElementById('currentKey').value = key;
+          document.getElementById(file.name).value = value;
+        }
+      }
+    };
+    reader.readAsText(file);
+
+
+  }
+
+  function save() {
+
+    persistKeyValue(currentLineGlobal);
+
+    for(var index = 0; index < outputGlobal.length; index++ ) { 
+      var textToWrite = "";
+      for(var line = 0; line < outputGlobal[index].length; line++) {
+        var textToWrite = textToWrite + outputGlobal[index][line] + '\n';
+      };
+      var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
+      var fileNameToSaveAs = listNameFilesGlobal[index];
+
+      var downloadLink = document.createElement("a");
+      downloadLink.download = fileNameToSaveAs;
+      downloadLink.innerHTML = "Download File";
+      if (window.webkitURL != null) {
+        // Chrome allows the link to be clicked
+        // without actually adding it to the DOM.
+        downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+      } else {
+        // Firefox requires the link to be added to the DOM
+        // before it can be clicked.
+        downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+        downloadLink.onclick = destroyClickedElement;
+        downloadLink.style.display = "none";
+        document.body.appendChild(downloadLink);
+      }
+      downloadLink.click();
+    };  
+  }
+
+  function persistKeyValue(line) {
+
+    for (var indexPrivious = 0; indexPrivious < listNameFilesGlobal.length; indexPrivious++) {
+      var name = listNameFilesGlobal[indexPrivious];
+      var keyPersistence = document.getElementById('currentKey').value;
+      var valuePersistence = document.getElementById(name).value;
+      outputGlobal[indexPrivious][line] = keyPersistence + "=" + valuePersistence;
+    };
+
+  }
+
+  function majRefKey(arrayLine) {
+
+    if(refKeyGlobal.length < arrayLine.length) {
+      for(var index = refKeyGlobal.length; index < arrayLine.length; index++) {
+        console.log("maj refKey");
+        refKeyGlobal[index] = arrayLine[index].split("=")[0];
+      };
+      totalLineGlobal = refKeyGlobal.length;
+    }
+
+      document.getElementById("numberKey").innerHTML = 'Current Key ' + currentLineGlobal + '/' + totalLineGlobal;
+  }
+
+  function fillKeys(arrayLine, name) {
+    var index = getIndex(name);
+    outputGlobal[index] = arrayLine;
+    for(var index = outputGlobal[index].length; index < refKeyGlobal.length; index++) {
+      outputGlobal[index] = refKeyGlobal[index]+ '=\n';
+    }
+  }
+
+  //tested : ok !
+  function getIndex(name) {
+    for(var index = 0; index < listNameFilesGlobal.length; index++) {
+      if(name == listNameFilesGlobal[index]) {
+        return index;
+      }
+    };
+    return 0;
+  }
+
+  function fillFields() {
+    for(var index=0; index < listNameFilesGlobal.length; index++) {
+      if(outputGlobal[index][currentLineGlobal].indexOf("=") > -1) {
+        document.getElementById(listNameFilesGlobal[index]).value = outputGlobal[index][currentLineGlobal].split("=")[1]; 
+      }
+    };
+  }
+
+  function majKeyValue(previousLine) {
+
+    persistKeyValue(previousLine);
+
+    for (var index = 0; index < listNameFilesGlobal.length; index++) {
+
+      var name = listNameFilesGlobal[index];
+
+      if( outputGlobal[index][currentLineGlobal].indexOf("=") > -1) {
+
+        var splitLine = outputGlobal[index][currentLineGlobal].split("=");
+
+        document.getElementById('currentKey').value = splitLine[0];
+        document.getElementById(name).value = splitLine[1];
+      } else {
+        document.getElementById(name).value = "";
+      }
+
+    };
+  }
+
+  function addKey() {
+
+    persistKeyValue(currentLineGlobal);
+
+    totalLineGlobal++;
+    currentLineGlobal = totalLineGlobal-1;
+
+    document.getElementById("currentKey").value = "";
+    for(var index=0; index < listNameFilesGlobal.length; index++) {
+      document.getElementById(listNameFilesGlobal[index]).value = "";
+    };
+
+    document.getElementById("numberKey").innerHTML = 'Current Key ' + currentLineGlobal + '/' + totalLineGlobal;
+    
+  }
+
+  function verifyName(name) {
+    for(var index =0; index < listNameFilesGlobal.length; index++) {
+      if(name == listNameFilesGlobal[index]) {
+        return false;
+      }
+    };
+    return true;
+  }
+  
+  document.querySelector('.readButtons').addEventListener('click', function(evt) {
+
+    var previousLine = currentLineGlobal;
+    console.log("event listener");
+    if (evt.target.tagName.toLowerCase() == 'button') {
+      //change the key pointer
+      if (evt.target.id == 'previous' && currentLineGlobal > 0) {
+        currentLineGlobal--;
+        document.getElementById("numberKey").innerHTML = 'Current Key ' + currentLineGlobal + '/' + totalLineGlobal;
+        majKeyValue(previousLine);
+
+      } else if (evt.target.id == 'next' && (1+currentLineGlobal) < totalLineGlobal) {
+        currentLineGlobal++;
+        document.getElementById("numberKey").innerHTML = 'Current Key ' + currentLineGlobal + '/' + totalLineGlobal;
+        majKeyValue(previousLine);
+      }
+
+    }
+
+  }, false);
+
+
+</script>
